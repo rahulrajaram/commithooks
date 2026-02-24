@@ -60,6 +60,19 @@ commithooks_block_sensitive_files
 commithooks_scan_secrets_in_diff
 ```
 
+In your repo's `.githooks/commit-msg`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+COMMITHOOKS_DIR="${COMMITHOOKS_DIR:-$HOME/Documents/commithooks}"
+source "$COMMITHOOKS_DIR/lib/common.sh"
+source "$COMMITHOOKS_DIR/lib/commit-msg.sh"
+
+commithooks_validate_conventional_commit "$1"
+commithooks_validate_subject_line "$1"
+```
+
 ### `lib/common.sh` — Shared utilities
 
 - `commithooks_red()` / `commithooks_green()` / `commithooks_warn()` — colored output
@@ -112,7 +125,7 @@ commithooks_scan_secrets_in_diff
 
 - `commithooks_reject_wip_commits <remote> <url>` — reject WIP/fixup/squash commits (reads stdin ref lines)
 - `commithooks_check_branch_name` — validate branch name against configurable pattern
-  - Configure pattern: `COMMITHOOKS_BRANCH_PATTERN='^(main|master|develop|...|feat/.+)$'`
+  - Default: `^(main|master|develop|release/.+|(feat|fix|chore|docs|refactor|test|ci|hotfix)/.+)$`
 - `commithooks_run_full_tests` — auto-detect project type and run test suite
   - Override: `COMMITHOOKS_TEST_CMD="make test"`
   - Timeout: `COMMITHOOKS_TEST_TIMEOUT=300`
@@ -124,7 +137,15 @@ commithooks_scan_secrets_in_diff
   - For post-merge: call with no args (compares `ORIG_HEAD` to `HEAD`)
   - For post-checkout: pass `$1` and `$2` (prev-HEAD and new-HEAD)
 
+## Self-enforcement
+
+This repo uses its own hooks via `.githooks/`:
+
+- **`.githooks/pre-commit`** — blocks sensitive files, scans for secrets, runs `shellcheck` and `bash -n` on staged shell files
+- **`.githooks/commit-msg`** — enforces conventional commit format and subject line rules
+- **`.githooks/pre-push`** — runs `shellcheck` and `bash -n` on **all** shell files as a final gate before push
+
 ## Environment
 
 - `COMMITHOOKS_DIR` sets the shared hook location (default `~/Documents/commithooks`).
-- `COMMITHOOKS_SKIP_NOOP=1` exits shared fallback hooks immediately (also suppresses the `pre-commit` informational message when no local hook is found).
+- `COMMITHOOKS_SKIP_NOOP=1` silently exits all dispatcher hooks when no local hook is found (without this, `pre-commit` prints an informational message; the other hooks are silent either way).
