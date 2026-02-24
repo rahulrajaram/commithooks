@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+COMMITHOOKS_DIR="${COMMITHOOKS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# shellcheck disable=SC1091
+source "$COMMITHOOKS_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+source "$COMMITHOOKS_DIR/lib/commit-msg.sh"
+
+commithooks_validate_conventional_commit "$1"
+commithooks_validate_subject_line "$1"
