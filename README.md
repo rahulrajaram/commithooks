@@ -137,9 +137,47 @@ commithooks_validate_subject_line "$1"
   - For post-merge: call with no args (compares `ORIG_HEAD` to `HEAD`)
   - For post-checkout: pass `$1` and `$2` (prev-HEAD and new-HEAD)
 
+## Installation methods
+
+### Method 1: Copy into `.git/` (recommended)
+
+Copy dispatchers and lib into the target repo's `.git/` directory:
+
+```bash
+SOURCE=~/Documents/commithooks   # or clone from GitHub
+GIT_DIR="$(git rev-parse --git-dir)"
+
+# Copy dispatchers
+for hook in pre-commit commit-msg pre-push post-checkout post-merge; do
+  cp "$SOURCE/$hook" "$GIT_DIR/hooks/$hook"
+  chmod +x "$GIT_DIR/hooks/$hook"
+done
+
+# Copy library
+cp -r "$SOURCE/lib" "$GIT_DIR/lib"
+```
+
+Then create `.githooks/` with local hook implementations (see examples above).
+
+### Method 2: `core.hooksPath` (alternative)
+
+Point git at the commithooks directory directly:
+
+```bash
+git config core.hooksPath ~/Documents/commithooks
+```
+
+Or use the helper: `./install-git-hooks.sh`
+
+Note: `core.hooksPath` overrides `.git/hooks/` entirely. Method 1 avoids this.
+
+### Method 3: `/install-commithooks` skill
+
+If using Claude Code or Codex, run `/install-commithooks` in any repo. The skill auto-detects project type and scaffolds appropriate local hooks.
+
 ## Self-enforcement
 
-This repo uses its own hooks via `.githooks/`:
+This repo dogfoods Method 1. Dispatchers live in `.git/hooks/`, lib in `.git/lib/`, and local hooks in `.githooks/`:
 
 - **`.githooks/pre-commit`** — blocks sensitive files, scans for secrets, runs `shellcheck` and `bash -n` on staged shell files
 - **`.githooks/commit-msg`** — enforces conventional commit format and subject line rules
@@ -147,5 +185,5 @@ This repo uses its own hooks via `.githooks/`:
 
 ## Environment
 
-- `COMMITHOOKS_DIR` sets the shared hook location (default `~/Documents/commithooks`).
+- `COMMITHOOKS_DIR` — where lib modules are sourced from. Defaults to repo root (for `.githooks/` hooks) or `.git/` (for Method 1 installs in other repos).
 - `COMMITHOOKS_SKIP_NOOP=1` silently exits all dispatcher hooks when no local hook is found (without this, `pre-commit` prints an informational message; the other hooks are silent either way).
