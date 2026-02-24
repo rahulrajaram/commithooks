@@ -30,7 +30,6 @@ Cross-project workflow:
 | `pre-commit` | Runs before commit is created |
 | `commit-msg` | Validates commit message |
 | `pre-push` | Runs before push (receives remote name + URL) |
-| `post-commit` | Runs after commit is created |
 | `post-checkout` | Runs after checkout (receives prev-HEAD, new-HEAD, branch-flag) |
 | `post-merge` | Runs after merge (receives squash flag) |
 
@@ -108,6 +107,22 @@ commithooks_scan_secrets_in_diff
 - `commithooks_check_version_sync <file1> <file2> ...` — verify version matches across files
   - Or set `COMMITHOOKS_VERSION_FILES="pyproject.toml package.json"`
 - `commithooks_require_version_bump <version-file> <source-path>...` — ensure version was bumped if source files changed
+
+### `lib/pre-push.sh` — Pre-push checks
+
+- `commithooks_reject_wip_commits <remote> <url>` — reject WIP/fixup/squash commits (reads stdin ref lines)
+- `commithooks_check_branch_name` — validate branch name against configurable pattern
+  - Configure pattern: `COMMITHOOKS_BRANCH_PATTERN='^(main|master|develop|...|feat/.+)$'`
+- `commithooks_run_full_tests` — auto-detect project type and run test suite
+  - Override: `COMMITHOOKS_TEST_CMD="make test"`
+  - Timeout: `COMMITHOOKS_TEST_TIMEOUT=300`
+
+### `lib/deps.sh` — Dependency reinstall after lockfile changes
+
+- `commithooks_reinstall_if_changed [prev-ref] [new-ref]` — detect lockfile changes and run the appropriate install command
+  - Supports: `Cargo.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `requirements*.txt`, `go.sum`
+  - For post-merge: call with no args (compares `ORIG_HEAD` to `HEAD`)
+  - For post-checkout: pass `$1` and `$2` (prev-HEAD and new-HEAD)
 
 ## Environment
 

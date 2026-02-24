@@ -18,13 +18,11 @@ chmod +x \
   "$commithooks_dir/pre-commit" \
   "$commithooks_dir/commit-msg" \
   "$commithooks_dir/pre-push" \
-  "$commithooks_dir/post-commit" \
   "$commithooks_dir/post-checkout" \
   "$commithooks_dir/post-merge"
 echo "Git hooks set to shared path: $commithooks_dir"
 echo " - pre-commit"
 echo " - commit-msg"
 echo " - pre-push"
-echo " - post-commit"
 echo " - post-checkout"
 echo " - post-merge"

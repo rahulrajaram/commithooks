@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+COMMITHOOKS_DIR="${COMMITHOOKS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# shellcheck disable=SC1091
+source "$COMMITHOOKS_DIR/lib/common.sh"
+# shellcheck disable=SC1091
+source "$COMMITHOOKS_DIR/lib/pre-push.sh"
+
+# Run shellcheck and syntax check on ALL shell files (final gate before publish)
+all_shell_files="$(find "$COMMITHOOKS_DIR" -maxdepth 2 \( -name '*.sh' -o -name 'pre-commit' -o -name 'commit-msg' -o -name 'pre-push' -o -name 'post-checkout' -o -name 'post-merge' \) -not -path '*/.git/*' | sort)"
+
+if [ -n "$all_shell_files" ] && commithooks_require_cmd "shellcheck"; then
+  commithooks_green "[pre-push] Running shellcheck on all shell files..."
+  # shellcheck disable=SC2086
+  shellcheck $all_shell_files
+fi
+
+if [ -n "$all_shell_files" ]; then
+  commithooks_green "[pre-push] Running bash -n on all shell files..."
+  err=0
+  while IFS= read -r f; do
+    if [ -f "$f" ] && ! bash -n "$f" 2>/dev/null; then
+      commithooks_red "[pre-push] Syntax error in: $f"
+      err=1
+    fi
+  done <<< "$all_shell_files"
+  if [ "$err" -ne 0 ]; then
+    exit 1
+  fi
+fi
