@@ -41,8 +41,9 @@ Each hook first tries to run a repository-local hook:
 1. `.githooks/<hook-name>`
 2. `scripts/git-hooks/<hook-name>`
 
-If no local hook exists, it falls back to a no-op baseline so all repos can still
-complete commits safely even without per-repo hook scripts.
+If no local hook is found (or the file is not executable), it falls back to a no-op
+baseline so all repos can still complete commits safely even without per-repo hook
+scripts.
 
 ## Library modules (`lib/`)
 
@@ -77,7 +78,8 @@ commithooks_scan_secrets_in_diff
 - `commithooks_validate_conventional_commit <msg-file>` — validates conventional commit format
   - Configure types: `COMMITHOOKS_CC_TYPES=feat,fix,docs,...`
   - Configure max length: `COMMITHOOKS_CC_MAX_LENGTH=72`
-- `commithooks_validate_subject_line <msg-file>` — checks trailing period, length
+- `commithooks_validate_subject_line <msg-file>` — checks empty subject, trailing period, length
+  - Configure max length: `COMMITHOOKS_SUBJECT_MAX_LENGTH=72`
 - Merge commits are automatically allowed through
 
 ### `lib/lint-rust.sh` — Rust project checks
@@ -110,4 +112,4 @@ commithooks_scan_secrets_in_diff
 ## Environment
 
 - `COMMITHOOKS_DIR` sets the shared hook location (default `~/Documents/commithooks`).
-- `COMMITHOOKS_SKIP_NOOP=1` exits shared fallback hooks immediately.
+- `COMMITHOOKS_SKIP_NOOP=1` exits shared fallback hooks immediately (also suppresses the `pre-commit` informational message when no local hook is found).
