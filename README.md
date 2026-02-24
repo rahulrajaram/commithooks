@@ -175,24 +175,38 @@ Note: `core.hooksPath` overrides `.git/hooks/` entirely. Method 1 avoids this.
 
 If using Claude Code or Codex, run `/install-commithooks` in any repo. The skill auto-detects project type and scaffolds appropriate local hooks.
 
-## Consumer setup.sh (recommended pattern)
+## Adding commithooks to a consumer repo
 
-Every repo that uses commithooks should include a `setup.sh` so contributors can bootstrap hooks after cloning. Copy the template into your repo and customize:
+To make your project a commithooks consumer, add hook installation to your existing
+dev setup path. The steps are always the same — copy dispatchers and lib into `.git/`:
 
 ```bash
-cp ~/Documents/commithooks/setup-template.sh ./setup.sh
-chmod +x setup.sh
-# Add project-specific steps at the bottom of setup.sh
+COMMITHOOKS="${COMMITHOOKS_DIR:-$HOME/Documents/commithooks}"
+GIT_DIR="$(git rev-parse --git-dir)"
+if [ -d "$COMMITHOOKS/lib" ]; then
+  for hook in pre-commit commit-msg pre-push post-checkout post-merge; do
+    [ -f "$COMMITHOOKS/$hook" ] && cp "$COMMITHOOKS/$hook" "$GIT_DIR/hooks/$hook" && chmod +x "$GIT_DIR/hooks/$hook"
+  done
+  rm -rf "${GIT_DIR:?}/lib" && cp -r "$COMMITHOOKS/lib" "$GIT_DIR/lib"
+fi
 ```
 
-The template (`setup-template.sh`) handles:
-- Cloning commithooks from GitHub if not available locally
-- Copying dispatchers into `.git/hooks/` (skips existing custom hooks)
-- Copying `lib/` into `.git/lib/`
-- Making `.githooks/` executable
-- Unsetting `core.hooksPath` if set
+Where to put this depends on your project:
 
-Contributors then run `./setup.sh` once after cloning.
+- **`install.sh`** — if your project has a dev setup script, add the snippet above
+- **Node (`package.json`)** — add a `"prepare"` or `"postinstall"` script:
+  ```json
+  "scripts": {
+    "prepare": "bash -c 'COMMITHOOKS=${COMMITHOOKS_DIR:-$HOME/Documents/commithooks}; GIT_DIR=$(git rev-parse --git-dir); [ -d $COMMITHOOKS/lib ] && for h in pre-commit commit-msg pre-push post-checkout post-merge; do [ -f $COMMITHOOKS/$h ] && cp $COMMITHOOKS/$h $GIT_DIR/hooks/$h && chmod +x $GIT_DIR/hooks/$h; done && rm -rf ${GIT_DIR}/lib && cp -r $COMMITHOOKS/lib $GIT_DIR/lib || true'"
+  }
+  ```
+- **Rust (`build.rs`)** — run the snippet as a build step
+- **Python (`Makefile`)** — add a `hooks` target called from your dev setup
+- **CLAUDE.md** — add `Run /install-commithooks if .git/lib/ is missing` so AI agents auto-install
+
+Then create `.githooks/pre-commit` and `.githooks/commit-msg` with your project-specific
+checks (see examples above) and commit them to the repo. Contributors get the hook
+implementations on clone; the dispatchers and lib get installed on first build/setup.
 
 ## Self-enforcement
 
