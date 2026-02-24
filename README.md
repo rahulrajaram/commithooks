@@ -13,15 +13,26 @@ This directory hosts reusable hooks for repos in `~/Documents`.
 - Set your repo hook path to this directory:
   - `git config core.hooksPath /path/to/commithooks`
 - Or use the helper script:
-  - `./scripts/install-git-hooks.sh`
+  - `./install-git-hooks.sh`
 
 Cross-project workflow:
 
-- Run `./scripts/install-git-hooks.sh` once in a repo.
+- Run `./install-git-hooks.sh` once in a repo.
 - Commit your project-specific hook implementation in either:
   - `.githooks/<hook-name>`
   - or `scripts/git-hooks/<hook-name>`
 - Keep shared behavior in this directory for consistency.
+
+## Supported hooks
+
+| Hook | Description |
+|---|---|
+| `pre-commit` | Runs before commit is created |
+| `commit-msg` | Validates commit message |
+| `pre-push` | Runs before push (receives remote name + URL) |
+| `post-commit` | Runs after commit is created |
+| `post-checkout` | Runs after checkout (receives prev-HEAD, new-HEAD, branch-flag) |
+| `post-merge` | Runs after merge (receives squash flag) |
 
 ## Resolution order
 
@@ -32,6 +43,69 @@ Each hook first tries to run a repository-local hook:
 
 If no local hook exists, it falls back to a no-op baseline so all repos can still
 complete commits safely even without per-repo hook scripts.
+
+## Library modules (`lib/`)
+
+Reusable shell functions that local hooks can source. In your repo's `.githooks/pre-commit`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+COMMITHOOKS_DIR="${COMMITHOOKS_DIR:-$HOME/Documents/commithooks}"
+source "$COMMITHOOKS_DIR/lib/common.sh"
+source "$COMMITHOOKS_DIR/lib/secrets.sh"
+
+commithooks_skip_during_rebase && exit 0
+commithooks_block_sensitive_files
+commithooks_scan_secrets_in_diff
+```
+
+### `lib/common.sh` — Shared utilities
+
+- `commithooks_red()` / `commithooks_green()` / `commithooks_warn()` — colored output
+- `commithooks_staged_files [ext]` — list staged files, optionally filtered by extension
+- `commithooks_require_cmd <cmd>` — check if command exists, warn and skip if not
+- `commithooks_skip_during_rebase` — returns 0 (true) during rebase/cherry-pick
+
+### `lib/secrets.sh` — Secret/credential scanning
+
+- `commithooks_scan_secrets_in_diff` — scans staged diff for 24+ secret patterns (AWS, GitHub, Slack, Google, OpenAI, HuggingFace, Stripe, private keys)
+- `commithooks_block_sensitive_files` — blocks staging of `.env`, `.pem`, `.key`, `.p12`, `credentials.json`, `id_rsa`, etc.
+
+### `lib/commit-msg.sh` — Commit message validation
+
+- `commithooks_validate_conventional_commit <msg-file>` — validates conventional commit format
+  - Configure types: `COMMITHOOKS_CC_TYPES=feat,fix,docs,...`
+  - Configure max length: `COMMITHOOKS_CC_MAX_LENGTH=72`
+- `commithooks_validate_subject_line <msg-file>` — checks trailing period, length
+- Merge commits are automatically allowed through
+
+### `lib/lint-rust.sh` — Rust project checks
+
+- `commithooks_rust_fmt` — `cargo fmt --check`
+- `commithooks_rust_clippy` — `cargo clippy -D warnings`
+- `commithooks_rust_test` — `cargo test`
+- `commithooks_rust_check` — `cargo check`
+- Set `COMMITHOOKS_CARGO_OFFLINE=1` for `--offline` flag
+
+### `lib/lint-python.sh` — Python project checks
+
+- `commithooks_python_syntax` — AST parse check on staged `.py` files
+- `commithooks_python_ruff` — `ruff check` (if available)
+- `commithooks_python_flake8` — `flake8` critical errors (if available)
+- `commithooks_python_test` — `pytest` with configurable timeout (`COMMITHOOKS_PYTEST_TIMEOUT=120`)
+
+### `lib/lint-js.sh` — JS/TS project checks
+
+- `commithooks_js_oxlint` — oxlint on staged files (if available)
+- `commithooks_js_eslint` — eslint on staged files (if available)
+- `commithooks_js_typecheck` — configurable typecheck (`COMMITHOOKS_TYPECHECK_CMD="npx tsc --noEmit"`)
+
+### `lib/version-sync.sh` — Version synchronization
+
+- `commithooks_check_version_sync <file1> <file2> ...` — verify version matches across files
+  - Or set `COMMITHOOKS_VERSION_FILES="pyproject.toml package.json"`
+- `commithooks_require_version_bump <version-file> <source-path>...` — ensure version was bumped if source files changed
 
 ## Environment
 

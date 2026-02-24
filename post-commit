@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Prevent infinite recursion when this repo uses its own hooks
+if [ "${_COMMITHOOKS_GUARD:-}" = "1" ]; then
+  exit 0
+fi
+export _COMMITHOOKS_GUARD=1
+
+repo_root="$(git rev-parse --show-toplevel || true)"
+if [ -z "$repo_root" ]; then
+  echo "Unable to determine repository root." >&2
+  exit 1
+fi
+
+local_hook_candidates=(
+  "$repo_root/.githooks/post-commit"
+  "$repo_root/scripts/git-hooks/post-commit"
+)
+
+for hook in "${local_hook_candidates[@]}"; do
+  if [ -x "$hook" ]; then
+    exec "$hook" "$@"
+  fi
+done
+
+if [ "${COMMITHOOKS_SKIP_NOOP:-0}" = "1" ]; then
+  exit 0
+fi
+
+exit 0

@@ -14,7 +14,17 @@ if [ ! -d "$commithooks_dir" ]; then
 fi
 
 git config core.hooksPath "$commithooks_dir"
-chmod +x "$commithooks_dir/pre-commit" "$commithooks_dir/commit-msg"
+chmod +x \
+  "$commithooks_dir/pre-commit" \
+  "$commithooks_dir/commit-msg" \
+  "$commithooks_dir/pre-push" \
+  "$commithooks_dir/post-commit" \
+  "$commithooks_dir/post-checkout" \
+  "$commithooks_dir/post-merge"
 echo "Git hooks set to shared path: $commithooks_dir"
-echo " - pre-commit: $commithooks_dir/pre-commit"
-echo " - commit-msg: $commithooks_dir/commit-msg"
+echo " - pre-commit"
+echo " - commit-msg"
+echo " - pre-push"
+echo " - post-commit"
+echo " - post-checkout"
+echo " - post-merge"
