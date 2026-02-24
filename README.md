@@ -175,6 +175,25 @@ Note: `core.hooksPath` overrides `.git/hooks/` entirely. Method 1 avoids this.
 
 If using Claude Code or Codex, run `/install-commithooks` in any repo. The skill auto-detects project type and scaffolds appropriate local hooks.
 
+## Consumer setup.sh (recommended pattern)
+
+Every repo that uses commithooks should include a `setup.sh` so contributors can bootstrap hooks after cloning. Copy the template into your repo and customize:
+
+```bash
+cp ~/Documents/commithooks/setup-template.sh ./setup.sh
+chmod +x setup.sh
+# Add project-specific steps at the bottom of setup.sh
+```
+
+The template (`setup-template.sh`) handles:
+- Cloning commithooks from GitHub if not available locally
+- Copying dispatchers into `.git/hooks/` (skips existing custom hooks)
+- Copying `lib/` into `.git/lib/`
+- Making `.githooks/` executable
+- Unsetting `core.hooksPath` if set
+
+Contributors then run `./setup.sh` once after cloning.
+
 ## Self-enforcement
 
 This repo dogfoods Method 1. Dispatchers live in `.git/hooks/`, lib in `.git/lib/`, and local hooks in `.githooks/`:
