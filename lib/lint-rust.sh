@@ -47,3 +47,13 @@ commithooks_rust_check() {
   # shellcheck disable=SC2086
   cargo check $offline
 }
+
+# Run cargo-deny license/advisory/ban checks.
+# Skips silently if cargo-deny is not installed or no deny.toml exists.
+commithooks_rust_deny() {
+  [ -f "Cargo.toml" ] || return 0
+  command -v cargo-deny &>/dev/null || return 0
+  [ -f "deny.toml" ] || return 0
+  commithooks_green "[rust] Running cargo deny check..."
+  cargo deny check 2>&1
+}

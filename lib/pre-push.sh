@@ -82,6 +82,11 @@ commithooks_run_full_tests() {
     commithooks_require_cmd "cargo" || return 0
     commithooks_green "[pre-push] Running cargo test..."
     timeout "$timeout" cargo test
+    # Run cargo-deny if available (license/advisory checks)
+    if command -v cargo-deny &>/dev/null && [ -f "deny.toml" ]; then
+      commithooks_green "[pre-push] Running cargo deny check..."
+      cargo deny check 2>&1
+    fi
   elif [ -f "package.json" ]; then
     if [ -f "node_modules/.package-lock.json" ] || [ -d "node_modules" ]; then
       commithooks_green "[pre-push] Running npm test..."
