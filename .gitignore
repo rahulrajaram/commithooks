@@ -1,0 +1,4 @@
+# Environment-specific patterns (AI tooling, agent state, OS, editor, secrets)
+# are managed globally in ~/.config/git/ignore by lib/global-gitignore.sh.
+# This repo is pure bash and produces no build artifacts of its own.
+test/test_workspace/

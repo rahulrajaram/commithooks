@@ -7,6 +7,9 @@ if [ "${_COMMITHOOKS_PRE_PUSH_LOADED:-}" = "1" ]; then
 fi
 _COMMITHOOKS_PRE_PUSH_LOADED=1
 
+# shellcheck disable=SC1091
+source "${COMMITHOOKS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/lint-rust.sh"
+
 # Reject commits with WIP/fixup/squash prefixes in unpushed commits.
 # Usage: commithooks_reject_wip_commits <remote> <url>
 # Reads stdin lines: <local ref> <local sha> <remote ref> <remote sha>
@@ -82,11 +85,7 @@ commithooks_run_full_tests() {
     commithooks_require_cmd "cargo" || return 0
     commithooks_green "[pre-push] Running cargo test..."
     timeout "$timeout" cargo test
-    # Run cargo-deny if available (license/advisory checks)
-    if command -v cargo-deny &>/dev/null && [ -f "deny.toml" ]; then
-      commithooks_green "[pre-push] Running cargo deny check..."
-      cargo deny check 2>&1
-    fi
+    commithooks_rust_deny
   elif [ -f "package.json" ]; then
     if [ -f "node_modules/.package-lock.json" ] || [ -d "node_modules" ]; then
       commithooks_green "[pre-push] Running npm test..."

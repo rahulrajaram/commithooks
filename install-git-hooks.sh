@@ -8,10 +8,16 @@ if [ -z "$repo_root" ]; then
 fi
 
 commithooks_dir="${COMMITHOOKS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+commithooks_dir="$(cd "$commithooks_dir" && pwd)"
 if [ ! -d "$commithooks_dir" ]; then
   echo "Shared hooks directory not found: $commithooks_dir" >&2
   exit 1
 fi
+
+# shellcheck disable=SC1091
+source "$commithooks_dir/lib/common.sh"
+# shellcheck disable=SC1091
+source "$commithooks_dir/lib/global-gitignore.sh"
 
 git config core.hooksPath "$commithooks_dir"
 chmod +x \
@@ -26,3 +32,5 @@ echo " - commit-msg"
 echo " - pre-push"
 echo " - post-checkout"
 echo " - post-merge"
+
+commithooks_ensure_global_gitignore
