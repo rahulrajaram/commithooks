@@ -23,6 +23,88 @@ Cross-project workflow:
   - or `scripts/git-hooks/<hook-name>`
 - Keep shared behavior in this directory for consistency.
 
+## How it works
+
+```
+INSTALLATION
+============
+
+  ./install-git-hooks.sh
+         |
+         |  1. git config core.hooksPath ~/Documents/commithooks
+         |  2. Populate ~/.config/git/ignore (managed block)
+         v
+  +-------------------------------+        +----------------------------+
+  | ~/.config/git/ignore          |        | consumer repo              |
+  |-------------------------------|        |----------------------------|
+  | # <commithooks:begin>         |        | .githooks/                 |
+  | VISION.md                     |        |   pre-commit  <-- you write|
+  | .claude/                      |        |   commit-msg  <-- you write|
+  | .env                          |        |                            |
+  | ...                           |        | src/  tests/  ...          |
+  | # <commithooks:end>           |        +----------------------------+
+  +-------------------------------+
+
+
+COMMIT-TIME EXECUTION (pre-commit shown; same pattern for all hooks)
+====================================================================
+
+  git commit
+       |
+       v
+  commithooks/pre-commit            <-- git calls this (via core.hooksPath)
+  (dispatcher)
+       |
+       |  1. Set recursion guard
+       |  2. Find repo root
+       |  3. Look for local hook:
+       |       $repo/.githooks/pre-commit
+       |       $repo/scripts/git-hooks/pre-commit
+       |
+       +----[not found]----> no-op baseline (exit 0)
+       |
+       +----[found]--------> exec $repo/.githooks/pre-commit
+                                    |
+                                    |  source commithooks/lib/common.sh
+                                    |  source commithooks/lib/secrets.sh
+                                    |  source commithooks/lib/llm-review.sh
+                                    |  source commithooks/lib/lint-*.sh
+                                    |
+                                    v
+                             +------+------+------+------+------+
+                             |      |      |      |      |      |
+                             v      v      v      v      v      v
+                          secrets  LLM   lint   lint   lint   shell
+                          scan    review  js    css   haskell check
+                             |      |
+                             |      +--[flagged]--> add to global
+                             |                      gitignore,
+                             |                      unstage file
+                             |
+                             +--[secret found]--> BLOCK commit
+
+
+PRE-PUSH EXECUTION
+===================
+
+  git push
+       |
+       v
+  commithooks/pre-push (dispatcher)
+       |
+       +----> exec $repo/.githooks/pre-push
+                      |
+                      v
+               reject WIP commits
+               validate branch name
+               run full test suite
+                      |
+                      v
+               shellcheck + bash -n    <-- runs on ALL shell files
+               on all .sh / hook       (final gate before publish)
+               scripts
+```
+
 ## Supported hooks
 
 | Hook | Description |
@@ -100,6 +182,7 @@ commithooks_validate_subject_line "$1"
 - `commithooks_rust_clippy` — `cargo clippy -D warnings`
 - `commithooks_rust_test` — `cargo test`
 - `commithooks_rust_check` — `cargo check`
+- `commithooks_rust_deny` — `cargo deny check` (license/advisory/ban checks; skips if cargo-deny not installed or no `deny.toml`)
 - Set `COMMITHOOKS_CARGO_OFFLINE=1` for `--offline` flag
 
 ### `lib/lint-python.sh` — Python project checks
@@ -114,6 +197,28 @@ commithooks_validate_subject_line "$1"
 - `commithooks_js_oxlint` — oxlint on staged files (if available)
 - `commithooks_js_eslint` — eslint on staged files (if available)
 - `commithooks_js_typecheck` — configurable typecheck (`COMMITHOOKS_TYPECHECK_CMD="npx tsc --noEmit"`)
+
+### `lib/lint-css.sh` — CSS project checks
+
+- `commithooks_css_stylelint` — stylelint on staged CSS/SCSS/SASS files (if available)
+
+### `lib/lint-haskell.sh` — Haskell project checks
+
+- `commithooks_haskell_hlint` — hlint on staged `.hs`/`.lhs` files (if available)
+
+### `lib/llm-review.sh` — LLM-based gitignore candidate assessment
+
+- `commithooks_llm_review` — scans staged files and asks an LLM (claude or codex) whether any belong in the global gitignore rather than version control. Files flagged by the LLM are added to `~/.config/git/ignore` and unstaged.
+  - `COMMITHOOKS_LLM_CLI=auto` — which CLI to use (`auto` tries claude then codex)
+  - `COMMITHOOKS_LLM_TIMEOUT=20` — seconds before the call is abandoned
+  - `COMMITHOOKS_LLM_REVIEW_MODE=warn` — `warn` allows the commit to proceed; `block` aborts
+  - `COMMITHOOKS_SKIP_LLM_REVIEW=1` — skip entirely (for offline/CI)
+
+### `lib/global-gitignore.sh` — Global gitignore management
+
+- `commithooks_ensure_global_gitignore` — writes or updates a managed block of patterns in `~/.config/git/ignore` (the XDG default that git discovers automatically). Patterns cover planning artifacts, agent state, OS/editor noise, and secrets. Called by `install-git-hooks.sh` on install.
+- `commithooks_global_gitignore_has <pattern>` — check if a pattern is already present
+- `commithooks_global_gitignore_add <pattern>` — append a pattern if not already present
 
 ### `lib/version-sync.sh` — Version synchronization
 
@@ -139,7 +244,19 @@ commithooks_validate_subject_line "$1"
 
 ## Installation methods
 
-### Method 1: Copy into `.git/` (recommended)
+### Method 1: `core.hooksPath` (recommended)
+
+Point git at the commithooks directory directly:
+
+```bash
+git config core.hooksPath ~/Documents/commithooks
+```
+
+Or use the helper: `./install-git-hooks.sh`
+
+This also populates `~/.config/git/ignore` with the managed global gitignore block.
+
+### Method 2: Copy into `.git/`
 
 Copy dispatchers and lib into the target repo's `.git/` directory:
 
@@ -158,18 +275,6 @@ cp -r "$SOURCE/lib" "$GIT_DIR/lib"
 ```
 
 Then create `.githooks/` with local hook implementations (see examples above).
-
-### Method 2: `core.hooksPath` (alternative)
-
-Point git at the commithooks directory directly:
-
-```bash
-git config core.hooksPath ~/Documents/commithooks
-```
-
-Or use the helper: `./install-git-hooks.sh`
-
-Note: `core.hooksPath` overrides `.git/hooks/` entirely. Method 1 avoids this.
 
 ### Method 3: `/install-commithooks` skill
 
@@ -202,17 +307,33 @@ Where to put this depends on your project:
   ```
 - **Rust (`build.rs`)** — run the snippet as a build step
 - **Python (`Makefile`)** — add a `hooks` target called from your dev setup
-- **CLAUDE.md** — add `Run /install-commithooks if .git/lib/ is missing` so AI agents auto-install
-
 Then create `.githooks/pre-commit` and `.githooks/commit-msg` with your project-specific
 checks (see examples above) and commit them to the repo. Contributors get the hook
 implementations on clone; the dispatchers and lib get installed on first build/setup.
 
+## Gitignore strategy
+
+Commithooks manages a **global gitignore** at `~/.config/git/ignore` (the XDG default
+that git discovers automatically). Running `install-git-hooks.sh` populates it with
+patterns for planning artifacts, agent state, OS/editor files, and secrets.
+
+- **Global gitignore** — patterns for the developer's environment, not the project.
+  These are invisible across all repos. Examples: `VISION.md`, `.yarli/`, `.claude/`,
+  `.env`, `*.swp`.
+- **Local `.gitignore`** — patterns inherent to the project's toolchain. These are
+  committed and shared with the team. Examples: `target/` (Rust), `node_modules/`,
+  `dist/`.
+
+At commit time, `commithooks_llm_review` in the pre-commit hook dynamically assesses
+staged files. If the LLM identifies a file as a developer-environment artifact that
+is missing from the global gitignore, it adds the pattern automatically and unstages
+the file.
+
 ## Self-enforcement
 
-This repo dogfoods Method 1. Dispatchers live in `.git/hooks/`, lib in `.git/lib/`, and local hooks in `.githooks/`:
+This repo dogfoods Method 2. Dispatchers live in `.git/hooks/`, lib in `.git/lib/`, and local hooks in `.githooks/`:
 
-- **`.githooks/pre-commit`** — blocks sensitive files, scans for secrets, runs `shellcheck` and `bash -n` on staged shell files
+- **`.githooks/pre-commit`** — blocks sensitive files, scans for secrets, runs LLM gitignore assessment, JS/TS lint (`oxlint`/`eslint`), CSS lint (`stylelint`), Haskell lint (`hlint`), plus `shellcheck` and `bash -n` on staged shell files
 - **`.githooks/commit-msg`** — enforces conventional commit format and subject line rules
 - **`.githooks/pre-push`** — runs `shellcheck` and `bash -n` on **all** shell files as a final gate before push
 

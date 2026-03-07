@@ -1,0 +1,57 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+      - name: Run shellcheck on all shell files
+        run: |
+          files=$(find . -maxdepth 2 \
+            \( -name '*.sh' \
+               -o -name 'pre-commit' \
+               -o -name 'commit-msg' \
+               -o -name 'pre-push' \
+               -o -name 'post-checkout' \
+               -o -name 'post-merge' \) \
+            -not -path '*/.git/*' | sort)
+          echo "Checking: $files"
+          shellcheck $files
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+      - name: Run integration tests
+        run: ./test/run_tests.sh
+
+  bash-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run bash -n on all shell files
+        run: |
+          err=0
+          for f in $(find . -maxdepth 2 \
+            \( -name '*.sh' \
+               -o -name 'pre-commit' \
+               -o -name 'commit-msg' \
+               -o -name 'pre-push' \
+               -o -name 'post-checkout' \
+               -o -name 'post-merge' \) \
+            -not -path '*/.git/*' | sort); do
+            if ! bash -n "$f" 2>&1; then
+              echo "FAIL: $f"
+              err=1
+            fi
+          done
+          exit $err
