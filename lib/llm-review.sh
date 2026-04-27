@@ -67,15 +67,22 @@ _commithooks_llm_call() {
   local cli="$1"
   local prompt="$2"
   local timeout_secs="${COMMITHOOKS_LLM_TIMEOUT:-20}"
+  local repo_root repo_slug
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  repo_slug="$(basename "$repo_root")"
 
   case "$cli" in
     claude)
       echo "$prompt" \
-        | timeout "$timeout_secs" claude --print 2>/dev/null
+        | AGENT_ATTRIBUTION_CALLER="${AGENT_ATTRIBUTION_CALLER:-commithooks-llm-review}" \
+          AGENT_ATTRIBUTION_PROJECT="${AGENT_ATTRIBUTION_PROJECT:-$repo_slug}" \
+          timeout "$timeout_secs" claude --print 2>/dev/null
       ;;
     codex)
       echo "$prompt" \
-        | timeout "$timeout_secs" codex --quiet 2>/dev/null
+        | AGENT_ATTRIBUTION_CALLER="${AGENT_ATTRIBUTION_CALLER:-commithooks-llm-review}" \
+          AGENT_ATTRIBUTION_PROJECT="${AGENT_ATTRIBUTION_PROJECT:-$repo_slug}" \
+          timeout "$timeout_secs" codex --quiet 2>/dev/null
       ;;
     *)
       return 1

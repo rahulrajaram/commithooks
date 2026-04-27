@@ -341,3 +341,5 @@ This repo dogfoods Method 2. Dispatchers live in `.git/hooks/`, lib in `.git/lib
 
 - `COMMITHOOKS_DIR` — where lib modules are sourced from. Defaults to repo root (for `.githooks/` hooks) or `.git/` (for Method 1 installs in other repos).
 - `COMMITHOOKS_SKIP_NOOP=1` silently exits all dispatcher hooks when no local hook is found (without this, `pre-commit` prints an informational message; the other hooks are silent either way).
+- `AGENT_ATTRIBUTION_CALLER` — optional attribution for LLM review subprocesses. Defaults to `commithooks-llm-review` when unset.
+- `AGENT_ATTRIBUTION_PROJECT` — optional project attribution for LLM review subprocesses. Defaults to the repository root directory name when unset.
